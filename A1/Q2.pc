@@ -1,0 +1,162 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+exec sql include sqlca;
+exec sql begin declare section;
+         char no[4];
+         char first[20];
+         char second[10];
+         char customer_table[1024];
+         char order_table[1024];
+         char line_item_table[1024];
+         char product_table[1024];
+         char *username= "fedora";
+         char *password= "oracle";
+exec sql end declare section;
+ 
+exec sql declare c_cursor cursor for
+         select *
+         from customer;
+
+exec sql declare o_cursor cursor for
+         select *
+         from order_t;
+
+exec sql declare l_cursor cursor for
+         select *
+         from line_item;
+
+exec sql declare p_cursor cursor for
+         select *
+         from product;
+
+void connect_to_oracle() {
+   exec sql connect :username identified by :password;
+   printf("Connected to ORACLE\n");
+}
+
+void create_tables() {
+   strcpy(customer_table, "create table customer (C# int primary key, Name varchar(10), Address varchar(25))");
+   strcpy(order_table, "create table order_t (O# int primary key, Customer_id int, O_Date varchar(10), Total_Price varchar(10))");
+   strcpy(line_item_table, "create table line_item (I# int primary key, Product_id int, Order_id int, Qty int)");
+   strcpy(product_table, "create table product (P# int primary key, Name varchar(10), Price varchar(10))");
+
+   exec sql set transaction read write;
+
+   exec sql execute immediate :customer_table;
+   exec sql execute immediate :order_table;
+   exec sql execute immediate :line_item_table;
+   exec sql execute immediate :product_table;
+}
+
+void curse_customers() {
+   exec sql open c_cursor;
+   printf("\nCUSTOMERS\n");
+
+   printf("C#    NAME                     Address \n");
+   printf("----- -------------------- ------------\n");
+
+   while(sqlca.sqlcode==0) {
+      exec sql fetch c_cursor
+      into :no, :first, :second;
+      printf("%4s  %10s %11s\n", no, first, second);
+   }
+
+   exec sql close c_cursor;
+}
+
+void curse_orders() {
+   exec sql open o_cursor;
+   printf("\nORDERS\n");
+
+   printf("O#     Customer ID           Date       Total Price \n");
+   printf("----- ------------ -------------------- ------------\n");
+
+   while(sqlca.sqlcode==0) {
+      exec sql fetch o_cursor
+      into :no, :first, :second;
+      printf("%4s  %10s %11s\n", no, first, second);
+   }
+
+   exec sql close o_cursor;
+}
+
+void curse_line_items() {
+   exec sql open l_cursor;
+   printf("\nLINE ITEMS\n");
+
+   printf("I#     Product Id         Order id       Qty \n");
+   printf("----- ------------ -------------------- ------------\n");
+
+   while(sqlca.sqlcode==0) {
+      exec sql fetch l_cursor
+      into :no, :first, :second;
+      printf("%4s  %10s %11s\n", no, first, second);
+   }
+
+   exec sql close l_cursor;
+}
+
+void curse_products() {
+   exec sql open p_cursor;
+   printf("\nPRODUCTS\n");
+
+   printf("P#    Name                  Price \n");
+   printf("----- -------------------- ------------\n");
+
+   while(sqlca.sqlcode==0) {
+      exec sql fetch p_cursor
+      into :no, :first, :second;
+      printf("%4s  %10s %11s\n", no, first, second);
+   }
+
+   exec sql close p_cursor;
+}
+
+void drop_tables() {
+   exec sql execute immediate "drop table customer";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n");  
+
+   exec sql execute immediate "drop table order_t";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n");  
+
+   exec sql execute immediate "drop table line_item";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n");  
+
+   exec sql execute immediate "drop table product";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n"); 
+
+   exec sql commit release;
+   exit(0);
+}
+
+int main()
+{
+   connect_to_oracle();
+
+   create_tables();
+
+   curse_customers();
+
+   curse_orders();
+
+   curse_line_items();
+
+   curse_products();
+
+   drop_tables();
+}
+ 
