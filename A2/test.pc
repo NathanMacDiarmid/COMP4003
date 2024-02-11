@@ -1,0 +1,18 @@
+declare
+command1 varchar(100) :=
+'create table account (
+acc# char(4), name varchar2(10),
+balance real)';
+command2 varchar(100) :=
+'insert into account values (1, ''John'',
+1000)';
+command3 varchar(100) :=
+'insert into account values (2, '’Kate", 5000)';
+command4 varchar(100) :=
+'insert into account values (3, "Tony", 2000)’;
+begin
+execute immediate command1;
+execute immediate command2;
+execute immediate command3;
+execute immediate command4;
+end;

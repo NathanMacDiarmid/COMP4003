@@ -1,0 +1,1156 @@
+/*******************************************************************
+Sample Program:  Dynamic SQL Method 4
+1. proc q1.pc
+2. cc -c q1.c -I/usr/include/oracle/11.2/client64
+3. cc -o q1 q1.o -L/usr/lib/oracle/11.2/client64/lib -lclntsh
+4. ./dsqlm4
+
+This program connects you to ORACLE using your username and
+password, then prompts you for a SQL statement.  You can enter
+any legal SQL statement.  Use regular SQL syntax, not embedded SQL.
+Your statement will be processed.  If it is a query, the rows
+fetched are displayed.
+You can enter multi-line statements.  The limit is 1023 characters.
+This sample program only processes up to MAX_ITEMS bind variables and
+MAX_ITEMS select-list items.  MAX_ITEMS is #defined to be 40.
+*******************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sqlca.h>
+
+/* Maximum lengths for customer and product names */
+#define MAX_NAME_LEN 50
+#define MAX_ADDRESS_LEN 100
+
+/* SQL descriptor structures for dynamic SQL */
+exec sql include sqlca;
+exec sql include sqlda;
+
+exec sql begin declare section;
+    char customer_table[1024];
+    char order_table[1024];
+    char line_item_table[1024];
+    char product_table[1024];
+    char customer[1024];
+    char order[1024];
+    char item[1024];
+    char product[1024];
+    char no[4];
+    char first[20];
+    char second[25];
+    char third[20];
+    char input_no[4];
+    char input_first[20];
+    char input_second[25];
+    char input_third[20];
+exec sql end declare section;
+
+/* Function prototypes */
+void sql_error();
+int add_customer();
+int display_customer();
+int add_product();
+int display_product();
+int add_line_item();
+int add_order();
+int add_customer_order();
+int display_customer_orders();
+int drop_tables(void);
+int create_tables(void);
+int insert_customers(void);
+int insert_orders(void);
+int insert_items(void);
+int insert_products(void);
+int curse_customers(void);
+int curse_products(void);
+int curse_line_items(void);
+int curse_orders(void);
+
+exec sql declare c_cursor cursor for
+         select *
+         from customer;
+
+exec sql declare p_cursor cursor for
+         select *
+         from product;
+
+exec sql declare o_cursor cursor for
+         select *
+         from order_t;
+
+exec sql declare l_cursor cursor for
+         select *
+         from line_item;
+
+int main() {
+
+    oracle_connect();
+
+    create_tables();
+
+    insert_customers();
+
+    insert_orders();
+
+    insert_items();
+
+    insert_products();
+
+    for (;;) {
+        printf("\nCommand Line Menu:\n");
+        printf("1. Add a customer\n");
+        printf("2. Display a customer\n");
+        printf("3. Add a product\n");
+        printf("4. Display a product\n");
+        printf("5. Add a line item\n");
+        printf("6. Add an order of line items\n");
+        printf("7. Add a customer order\n");
+        printf("8. List all orders of a given customer\n");
+        printf("9. List customers who ordered the given product\n");
+        printf("10. Drop all tables\n");
+        printf("11. Display all customers\n");
+        printf("12. Display all products\n");
+        printf("13. Display all orders\n");
+        printf("14. Display all line_items\n");
+        printf("0. Exit\n");
+
+        int choice;
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                add_customer();
+                break;
+            case 2:
+                display_customer();
+                break;
+            case 3:
+                add_product();
+                break;
+            case 4:
+                display_product();
+                break;
+            case 5:
+                add_line_item();
+                break;
+            case 6:
+                add_order();
+                break;
+            case 7:
+                add_customer_order();
+                break;
+            case 8:
+                display_customer_orders();
+                break;
+            case 9:
+                display_customer_products();
+                break;
+            case 10:
+                drop_tables();
+                break;
+            case 11:
+                curse_customers();
+                break;
+            case 12:
+                curse_products();
+                break;
+            case 13:
+                curse_orders();
+                break;
+            case 14:
+                curse_line_items();
+                break;
+            case 0:
+                printf("Exiting program.\n");
+                exit(0);
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    }
+
+    return 0;
+}
+
+int add_customer() {
+    int index = 1;
+    int added = 0;
+    strcpy(customer, "insert into customer values (:v1, :v2, :v3)");
+
+    exec sql prepare s from :customer;
+
+    while (added == 0) {
+        printf("Enter a customer name: ");
+        scanf("%s", &input_first);
+
+        printf("Enter a customer address: ");
+        scanf("%s", &input_second);
+        exec sql open c_cursor;
+
+        exec sql fetch c_cursor
+        into :no, :first, :second;
+        while(sqlca.sqlcode==0) {
+            index++;
+            if (strncmp(first, input_first, strlen(input_first)) == 0) {
+                printf("Customer name already exists\n");
+                added = 0;
+                index = 1;
+                break;
+            } else {
+                added = 1;
+            }
+            exec sql fetch c_cursor
+            into :no, :first, :second;
+        }
+
+        exec sql close c_cursor;
+    }
+
+    sprintf(input_no, "%d", index); 
+
+    exec sql execute s using :input_no, :input_first, :input_second;
+
+    printf("Customer added successfully.\n");
+
+    return 0;
+}
+
+int display_customer() {
+    strcpy(customer, "select * from customer where customer.name = :v1");
+
+    exec sql prepare s from :customer;
+
+    exec sql declare a_cursor cursor for s;
+
+    printf("Enter a customer name: ");
+    scanf("%s", &input_first);
+
+    exec sql open a_cursor using :input_first;
+
+    printf("C#    NAME                     Address \n");
+    printf("----- -------------------- ------------\n");
+    exec sql fetch a_cursor into :no, :first, :second;
+    while(sqlca.sqlcode==0) {
+        printf("%4s  %10s %10s\n", no, first, second);
+        exec sql fetch a_cursor into :no, :first, :second;
+    }
+    exec sql close a_cursor;
+    return 0;
+}
+
+int add_product() {
+    int index = 1;
+    int added = 0;
+    strcpy(product, "insert into product values (:v1, :v2, :v3)");
+
+    exec sql prepare s from :product;
+
+    while (added == 0) {
+        printf("Enter a product name: ");
+        scanf("%s", &input_first);
+
+        printf("Enter a product price: ");
+        scanf("%s", &input_second);
+
+        exec sql open p_cursor;
+
+        exec sql fetch p_cursor
+        into :no, :first, :second;
+        while(sqlca.sqlcode==0) {
+            index++;
+            if (strncmp(first, input_first, strlen(input_first)) == 0) {
+                printf("Product name already exists\n");
+                added = 0;
+                index = 1;
+                break;
+            } else {
+                added = 1;
+            }
+            exec sql fetch p_cursor
+            into :no, :first, :second;
+        }
+
+        exec sql close p_cursor;
+    }
+
+    sprintf(input_no, "%d", index); 
+
+    exec sql execute s using :input_no, :input_first, :input_second;
+
+    printf("Product added successfully.\n");
+    return 0;
+}
+
+int display_product() {
+    strcpy(product, "select * from product where product.name = :v1");
+
+    exec sql prepare s from :product;
+
+    exec sql declare b_cursor cursor for s;
+
+    printf("Enter a product name: ");
+    scanf("%s", &input_first);
+
+    exec sql open b_cursor using :input_first;
+
+    printf("P#    Product Name         Price \n");
+    printf("----- -------------------- ------------\n");
+    exec sql fetch b_cursor into :no, :first, :second;
+    while(sqlca.sqlcode==0) {
+        printf("%4s  %10s %10s\n", no, first, second);
+        exec sql fetch b_cursor into :no, :first, :second;
+    }
+    exec sql close b_cursor;
+    return 0;
+}
+
+int add_line_item() {
+    int index = 1;
+    int found = 0;
+    strcpy(item, "insert into line_item values (:v1, :v2, :v3, :v4)");
+
+    exec sql prepare s from :item;
+
+    while(found == 0) {
+        printf("Enter a product id: ");
+        scanf("%s", &input_first);
+
+        exec sql open p_cursor;
+        exec sql fetch p_cursor
+        into :no, :first, :second;
+
+        while(sqlca.sqlcode==0) {
+            if (strncmp(no, input_first, strlen(input_first)) == 0) {
+                found = 1;
+                break;
+            }
+            exec sql fetch p_cursor
+            into :no, :first, :second;
+        }
+
+        if (found == 0) {
+            printf("Product id not found\n");
+        }
+
+        exec sql close p_cursor;
+    }
+
+    found = 0;
+
+    while(found == 0) {
+        printf("Enter a order id: ");
+        scanf("%s", &input_second);
+
+        exec sql open o_cursor;
+        exec sql fetch o_cursor
+        into :no, :first, :second;
+
+        while(sqlca.sqlcode==0) {
+            if (strncmp(no, input_second, strlen(input_second)) == 0) {
+                found = 1;
+                break;
+            }
+            exec sql fetch o_cursor
+            into :no, :first, :second;
+        }
+
+        if (found == 0) {
+            printf("Order id not found\n");
+        }
+
+        exec sql close o_cursor;
+    }
+
+    printf("Enter a quantity: ");
+    scanf("%s", &input_third);
+
+    exec sql open l_cursor;
+
+    exec sql fetch l_cursor
+    into :no, :first, :second, :third;
+    while(sqlca.sqlcode==0) {
+        index++;
+        exec sql fetch l_cursor
+        into :no, :first, :second, :third;
+    }
+
+    exec sql close l_cursor;
+
+    sprintf(input_no, "%d", index); 
+
+    exec sql execute s using :input_no, :input_first, :input_second, :input_third;
+
+    printf("Line Item added successfully.\n");
+    return 0;
+}
+
+int add_order() {
+    int order_index = 1;
+    int item_index = 1;
+    int added = 0;
+    int found = 0;
+    int more_items = 0;
+    float total = 0.0;
+    float final_total = 0.0;
+    strcpy(order, "insert into order_t values (:v1, :v2, :v3, :v4)");
+
+    exec sql prepare s from :order;
+
+    while (added == 0) {
+        printf("Enter a customer id: ");
+        scanf("%s", &input_first);
+
+        exec sql open c_cursor;
+
+        exec sql fetch c_cursor
+        into :no, :first, :second;
+        while(sqlca.sqlcode==0) {
+            if (strncmp(no, input_first, strlen(input_first)) == 0) {
+                added = 1;
+                break;
+            } else {
+                added = 0;
+            }
+            exec sql fetch c_cursor
+            into :no, :first, :second;
+        }
+
+        if (added == 0) {
+            printf("Customer id does not exists\n");
+        }
+
+        exec sql close c_cursor;
+    }
+
+    printf("Enter a order date: ");
+    scanf("%s", &input_second);
+
+    exec sql open o_cursor;
+
+    exec sql fetch o_cursor
+    into :no, :first, :second, :third;
+    while(sqlca.sqlcode==0) {
+        order_index++;
+        exec sql fetch o_cursor
+        into :no, :first, :second, :third;
+    }
+
+    exec sql close o_cursor;
+
+    sprintf(input_no, "%d", order_index); 
+
+    strcpy(input_third, "0.00");
+
+    exec sql execute s using :input_no, :input_first, :input_second, :input_third;
+
+    while (more_items == 0) {
+        found = 0;
+        item_index = 1;
+        strcpy(item, "insert into line_item values (:v1, :v2, :v3, :v4)");
+
+        exec sql prepare s from :item;
+
+        while(found == 0) {
+            printf("Enter a product id: ");
+            scanf("%s", &input_first);
+
+            exec sql open p_cursor;
+            exec sql fetch p_cursor
+            into :no, :first, :second;
+
+            while(sqlca.sqlcode==0) {
+                if (strncmp(no, input_first, strlen(input_first)) == 0) {
+                    found = 1;
+                    total = total + atof(second);
+                    break;
+                }
+                exec sql fetch p_cursor
+                into :no, :first, :second;
+            }
+
+            if (found == 0) {
+                printf("Product id not found\n");
+            }
+
+            exec sql close p_cursor;
+        }
+
+        sprintf(input_second, "%d", order_index); 
+
+        printf("Enter a quantity: ");
+        scanf("%s", &input_third);
+
+        exec sql open l_cursor;
+
+        exec sql fetch l_cursor
+        into :no, :first, :second, :third;
+        while(sqlca.sqlcode==0) {
+            item_index++;
+            exec sql fetch l_cursor
+            into :no, :first, :second, :third;
+        }
+
+        exec sql close l_cursor;
+
+        sprintf(input_no, "%d", item_index); 
+
+        exec sql execute s using :input_no, :input_first, :input_second, :input_third;
+
+        final_total = final_total + (total * atof(input_third));
+
+        total = 0.0;
+
+        printf("More items? 0 - more 1 - done: ");
+        scanf("%d", &more_items);
+    }
+
+    sprintf(input_third, "%.2f", final_total); 
+
+    strcpy(order, "update order_t set Total_Price = :v1 where O# = :v2");
+
+    exec sql prepare s from :order;
+
+    exec sql declare e_cursor cursor for s;
+
+    exec sql open e_cursor using :input_third, :order_index;
+
+    exec sql fetch e_cursor into :no, :first, :second, :third;
+    while(sqlca.sqlcode==0) {
+        exec sql fetch e_cursor into :no, :first, :second, :third;
+    }
+
+    exec sql close e_cursor;
+
+    printf("Order added successfully.\n");
+
+    return 0;
+}
+
+int add_customer_order() {
+    int order_index = 1;
+    int item_index = 1;
+    int index = 1;
+    int added = 0;
+    int found = 0;
+    int more_items = 0;
+    float total = 0.0;
+    float final_total = 0.0;
+
+    strcpy(customer, "insert into customer values (:v1, :v2, :v3)");
+
+    exec sql prepare s from :customer;
+
+    while (added == 0) {
+        printf("Enter a customer name: ");
+        scanf("%s", &input_first);
+
+        printf("Enter a customer address: ");
+        scanf("%s", &input_second);
+
+        exec sql open c_cursor;
+
+        exec sql fetch c_cursor
+        into :no, :first, :second;
+        while(sqlca.sqlcode==0) {
+            index++;
+            if (strncmp(first, input_first, strlen(input_first)) == 0) {
+                printf("Customer name already exists\n");
+                added = 0;
+                index = 1;
+                break;
+            } else {
+                added = 1;
+            }
+            exec sql fetch c_cursor
+            into :no, :first, :second;
+        }
+
+        exec sql close c_cursor;
+    }
+
+    sprintf(input_no, "%d", index); 
+
+    exec sql execute s using :input_no, :input_first, :input_second;
+
+    printf("Customer added successfully.\n");
+
+    strcpy(order, "insert into order_t values (:v1, :v2, :v3, :v4)");
+
+    exec sql prepare s from :order;
+
+    strcpy(input_first, input_no);
+
+    printf("Enter a order date: ");
+    scanf("%s", &input_second);
+
+    exec sql open o_cursor;
+
+    exec sql fetch o_cursor
+    into :no, :first, :second, :third;
+    while(sqlca.sqlcode==0) {
+        order_index++;
+        exec sql fetch o_cursor
+        into :no, :first, :second, :third;
+    }
+
+    exec sql close o_cursor;
+
+    sprintf(input_no, "%d", order_index); 
+
+    strcpy(input_third, "0.00");
+
+    exec sql execute s using :input_no, :input_first, :input_second, :input_third;
+
+    while (more_items == 0) {
+        found = 0;
+        item_index = 1;
+        strcpy(item, "insert into line_item values (:v1, :v2, :v3, :v4)");
+
+        exec sql prepare s from :item;
+
+        while(found == 0) {
+            printf("Enter a product id: ");
+            scanf("%s", &input_first);
+
+            exec sql open p_cursor;
+            exec sql fetch p_cursor
+            into :no, :first, :second;
+
+            while(sqlca.sqlcode==0) {
+                if (strncmp(no, input_first, strlen(input_first)) == 0) {
+                    found = 1;
+                    total = total + atof(second);
+                    break;
+                }
+                exec sql fetch p_cursor
+                into :no, :first, :second;
+            }
+
+            if (found == 0) {
+                printf("Product id not found\n");
+            }
+
+            exec sql close p_cursor;
+        }
+
+        sprintf(input_second, "%d", order_index); 
+
+        printf("Enter a quantity: ");
+        scanf("%s", &input_third);
+
+        exec sql open l_cursor;
+
+        exec sql fetch l_cursor
+        into :no, :first, :second, :third;
+        while(sqlca.sqlcode==0) {
+            item_index++;
+            exec sql fetch l_cursor
+            into :no, :first, :second, :third;
+        }
+
+        exec sql close l_cursor;
+
+        sprintf(input_no, "%d", item_index); 
+
+        exec sql execute s using :input_no, :input_first, :input_second, :input_third;
+
+        final_total = final_total + (total * atof(input_third));
+
+        total = 0.0;
+
+        printf("More items? 0 - more 1 - done: ");
+        scanf("%d", &more_items);
+    }
+
+    sprintf(input_third, "%.2f", final_total); 
+
+    strcpy(order, "update order_t set Total_Price = :v1 where O# = :v2");
+
+    exec sql prepare s from :order;
+
+    exec sql declare d_cursor cursor for s;
+
+    exec sql open d_cursor using :input_third, :order_index;
+
+    exec sql fetch d_cursor into :no, :first, :second, :third;
+    while(sqlca.sqlcode==0) {
+        exec sql fetch d_cursor into :no, :first, :second, :third;
+    }
+
+    exec sql close d_cursor;
+
+    printf("Order added successfully.\n");
+
+    return 0;
+}
+
+int display_customer_orders() {
+   strcpy(customer, "select order_t.O#, customer.Name, order_t.o_date, order_t.Total_Price from order_t inner join customer on order_t.customer_id = customer.C# where customer.name = :v1");
+
+   exec sql prepare t from :customer;
+
+   exec sql declare f_cursor cursor for t;
+
+   printf("Enter a customer name: ");
+   scanf("%s", &first);
+
+   exec sql open f_cursor using :first;
+
+   printf("\nO#   Customer name      Order date       Total Price \n");
+   printf("----- ------------ -------------------- ------------\n");
+
+   exec sql fetch f_cursor into :no, :first, :second, :third;
+   while(sqlca.sqlcode==0) {
+      printf("%4s  %10s %10s %10s\n", no, first, second, third);
+      exec sql fetch f_cursor into :no, :first, :second, :third;
+   }
+
+   exec sql close f_cursor;
+
+   return 0;
+}
+
+int display_customer_products() {
+   strcpy(customer, "select distinct customer.c#, customer.name, customer.address, product.name from customer join order_t on customer.c# = order_t.customer_id join line_item on order_t.o# = line_item.order_id join product on line_item.product_id = product.p# where product.name = :v1");
+   exec sql prepare t from :customer;
+
+   exec sql declare g_cursor cursor for t;
+
+   printf("Enter a customer name: ");
+   scanf("%s", &first);
+
+   exec sql open g_cursor using :first;
+
+   printf("\nC#   Customer name  Customer address    Product \n");
+   printf("----- ------------ -------------------- ------------\n");
+
+   exec sql fetch g_cursor into :no, :first, :second, :third;
+   while(sqlca.sqlcode==0) {
+      printf("%4s  %10s %10s %10s\n", no, first, second, third);
+      exec sql fetch g_cursor into :no, :first, :second, :third;
+   }
+
+   exec sql close g_cursor;
+
+   return 0;
+}
+
+void sql_error() {
+    printf("\n%.70s\n", sqlca.sqlerrm.sqlerrmc);
+    exec sql whenever sqlerror continue;
+    exec sql rollback work;
+    exit(1);
+}
+
+int curse_customers() {
+   exec sql open c_cursor;
+   printf("\nCUSTOMERS\n");
+
+   printf("C#    NAME                     Address \n");
+   printf("----- -------------------- ------------\n");
+   exec sql fetch c_cursor
+      into :no, :first, :second;
+   while(sqlca.sqlcode==0) {
+      printf("%4s  %10s %11s\n", no, first, second);
+      exec sql fetch c_cursor
+      into :no, :first, :second;
+   }
+
+   exec sql close c_cursor;
+
+   return 0;
+}
+
+int curse_products() {
+   exec sql open p_cursor;
+   printf("\nPRODUCTS\n");
+
+   printf("P#    Name                  Price \n");
+   printf("----- -------------------- ------------\n");
+
+   exec sql fetch p_cursor
+      into :no, :first, :second;
+   while(sqlca.sqlcode==0) {
+      printf("%4s  %10s %11s\n", no, first, second);
+      exec sql fetch p_cursor
+      into :no, :first, :second;
+   }
+
+   exec sql close p_cursor;
+   return 0;
+}
+
+int curse_orders() {
+   exec sql open o_cursor;
+   printf("\nORDERS\n");
+
+   printf("O#     Customer ID           Date       Total Price \n");
+   printf("----- ------------ -------------------- ------------\n");
+   exec sql fetch o_cursor
+      into :no, :first, :second, :third;
+   while(sqlca.sqlcode==0) {
+      printf("%4s  %10s %11s  %10s\n", no, first, second, third);
+      exec sql fetch o_cursor
+      into :no, :first, :second, :third;
+   }
+
+   exec sql close o_cursor;
+   return 0;
+}
+
+int curse_line_items() {
+   exec sql open l_cursor;
+   printf("\nLINE ITEMS\n");
+
+   printf("I#     Product Id         Order id       Qty \n");
+   printf("----- ------------ -------------------- ------------\n");
+   exec sql fetch l_cursor
+      into :no, :first, :second, :third;
+   while(sqlca.sqlcode==0) {
+      printf("%4s  %10s  %10s  %10s\n", no, first, second, third);
+      exec sql fetch l_cursor
+      into :no, :first, :second, :third;
+   }
+
+   exec sql close l_cursor;
+   return 0;
+}
+
+int oracle_connect()
+{
+    exec sql begin declare section;
+        varchar  username[128];
+        varchar  password[32];
+    exec sql end declare section;
+
+    printf("\nLogin to ORACLE\n");
+
+    printf("\nusername: ");
+    fgets((char *) username.arr, sizeof username.arr, stdin);
+    username.arr[strlen((char *) username.arr)-1] = '\0';
+    username.len = (unsigned short)strlen((char *) username.arr);
+
+    printf("password: ");
+    fgets((char *) password.arr, sizeof password.arr, stdin);
+    password.arr[strlen((char *) password.arr) - 1] = '\0';
+    password.len = (unsigned short)strlen((char *) password.arr);
+
+    exec sql connect :username identified by :password;
+
+    printf("\nConnected to ORACLE as user %s.\n", username.arr);
+
+    return 0;
+}
+
+int create_tables() {
+   strcpy(customer_table, "create table customer (C# int primary key, Name varchar(10), Address varchar(25))");
+   strcpy(order_table, "create table order_t (O# int primary key, Customer_id int, O_Date varchar(10), Total_Price varchar(10))");
+   strcpy(line_item_table, "create table line_item (I# int primary key, Product_id int, Order_id int, Qty int)");
+   strcpy(product_table, "create table product (P# int primary key, Name varchar(10), Price varchar(10))");
+
+   exec sql execute immediate :customer_table;
+   exec sql execute immediate :order_table;
+   exec sql execute immediate :line_item_table;
+   exec sql execute immediate :product_table;
+   return 0;
+}
+
+int insert_customers() {
+   strcpy(customer, "insert into customer values (:v1, :v2, :v3)");
+
+   exec sql prepare s from :customer;
+
+   strcpy(no, "1");
+   strcpy(first, "Smith");
+   strcpy(second, "1121 Colonel By Dr");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "2");
+   strcpy(first, "Jones");
+   strcpy(second, "1122 Colonel By Dr");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "3");
+   strcpy(first, "Blake");
+   strcpy(second, "1123 Colonel By Dr");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "4");
+   strcpy(first, "Clark");
+   strcpy(second, "1124 Colonel By Dr");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "5");
+   strcpy(first, "MacDiarmid");
+   strcpy(second, "1125 Colonel By Dr");
+
+   exec sql execute s using :no, :first, :second;
+   return 0;
+}
+
+int insert_orders() {
+   strcpy(order, "insert into order_t values (:v1, :v2, :v3, :v4)");
+
+   exec sql prepare s from :order;
+
+   strcpy(no, "1");
+   strcpy(first, "1");
+   strcpy(second, "Jan 1 2024");
+   strcpy(third, "1.25");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "2");
+   strcpy(first, "2");
+   strcpy(second, "Jan 2 2024");
+   strcpy(third, "2.04");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "3");
+   strcpy(first, "3");
+   strcpy(second, "Jan 3 2024");
+   strcpy(third, "3.34");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "4");
+   strcpy(first, "4");
+   strcpy(second, "Jan 4 2024");
+   strcpy(third, "5.13");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "5");
+   strcpy(first, "5");
+   strcpy(second, "Jan 5 2024");
+   strcpy(third, "13.12");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "6");
+   strcpy(first, "5");
+   strcpy(second, "Jan 6 2024");
+   strcpy(third, "14.37");
+
+   exec sql execute s using :no, :first, :second, :third;
+   return 0;
+}
+
+int insert_items() {
+   strcpy(item, "insert into line_item values (:v1, :v2, :v3, :v4)");
+
+   exec sql prepare s from :item;
+
+   strcpy(no, "1");
+   strcpy(first, "1");
+   strcpy(second, "1");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "2");
+   strcpy(first, "1");
+   strcpy(second, "2");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "3");
+   strcpy(first, "2");
+   strcpy(second, "2");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "4");
+   strcpy(first, "1");
+   strcpy(second, "3");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "5");
+   strcpy(first, "2");
+   strcpy(second, "3");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "6");
+   strcpy(first, "3");
+   strcpy(second, "3");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "7");
+   strcpy(first, "1");
+   strcpy(second, "4");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "8");
+   strcpy(first, "2");
+   strcpy(second, "4");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "9");
+   strcpy(first, "3");
+   strcpy(second, "4");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "10");
+   strcpy(first, "4");
+   strcpy(second, "4");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "11");
+   strcpy(first, "1");
+   strcpy(second, "5");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "12");
+   strcpy(first, "2");
+   strcpy(second, "5");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "13");
+   strcpy(first, "3");
+   strcpy(second, "5");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "14");
+   strcpy(first, "4");
+   strcpy(second, "5");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "15");
+   strcpy(first, "5");
+   strcpy(second, "5");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "16");
+   strcpy(first, "1");
+   strcpy(second, "6");
+   strcpy(third, "2");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "17");
+   strcpy(first, "2");
+   strcpy(second, "6");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "18");
+   strcpy(first, "3");
+   strcpy(second, "6");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "19");
+   strcpy(first, "4");
+   strcpy(second, "6");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+
+   strcpy(no, "20");
+   strcpy(first, "5");
+   strcpy(second, "6");
+   strcpy(third, "1");
+
+   exec sql execute s using :no, :first, :second, :third;
+   return 0;
+}
+
+int insert_products() {
+   strcpy(product, "insert into product values (:v1, :v2, :v3)");
+
+   exec sql prepare s from :product;
+
+   strcpy(no, "1");
+   strcpy(first, "apple");
+   strcpy(second, "1.25");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "2");
+   strcpy(first, "banana");
+   strcpy(second, "0.79");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "3");
+   strcpy(first, "orange");
+   strcpy(second, "1.30");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "4");
+   strcpy(first, "peach");
+   strcpy(second, "1.79");
+
+   exec sql execute s using :no, :first, :second;
+
+   strcpy(no, "5");
+   strcpy(first, "watermelon");
+   strcpy(second, "7.99");
+
+   exec sql execute s using :no, :first, :second;
+   return 0;
+}
+
+int drop_tables() {
+   exec sql execute immediate "drop table customer";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n");  
+
+   exec sql execute immediate "drop table order_t";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n");  
+
+   exec sql execute immediate "drop table line_item";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n");  
+
+   exec sql execute immediate "drop table product";
+   if (sqlca.sqlcode == 0)
+      printf("Table dropped \n");    
+   else
+      printf("Table not dropped \n"); 
+
+   return 0;
+}
