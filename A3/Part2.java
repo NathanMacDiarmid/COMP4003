@@ -9,7 +9,7 @@ public class Part2 {
         try {
             DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
             Connection conn = DriverManager.getConnection("jdbc:oracle:thin:@localhost:1521:xe", "fedora", "oracle");
-            createTables(conn);
+            //createTables(conn);
             displayMenu(conn);
             conn.close();
         } catch (Exception e) {
@@ -116,7 +116,7 @@ public class Part2 {
     }
 
     public static void displayCustomer(Connection conn) throws SQLException {
-        CallableStatement stmt = conn.prepareCall("{ call CPO.printCustomer(?) }");
+        CallableStatement stmt = conn.prepareCall("{ call CPO.printCustomer(?, ?, ?, ?) }");
         @SuppressWarnings("resource")
         Scanner myObj = new Scanner(System.in);
         String name;
@@ -124,7 +124,16 @@ public class Part2 {
         System.out.print("Enter a name: ");
         name = myObj.nextLine();
         stmt.setString(1, name);
+        stmt.registerOutParameter(2, OracleTypes.INTEGER);
+        stmt.registerOutParameter(3, OracleTypes.VARCHAR);
+        stmt.registerOutParameter(4, OracleTypes.VARCHAR);
         stmt.execute();
+        Integer id = stmt.getInt(2);
+        String regName = stmt.getString(3);
+        String address = stmt.getString(4);
+        System.out.println("id: " + id);
+        System.out.println("regName: " + regName);
+        System.out.println("address: " + address);
         stmt.close();
     }
 

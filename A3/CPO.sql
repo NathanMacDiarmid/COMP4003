@@ -7,7 +7,7 @@ CREATE OR REPLACE PACKAGE CPO AS
     PROCEDURE dropTables;
     PROCEDURE addCustomer(name IN VARCHAR2, address IN VARCHAR2);
     PROCEDURE addProduct(name IN VARCHAR2, Price IN FLOAT);
-    PROCEDURE printCustomer(name IN VARCHAR2);
+    PROCEDURE printCustomer(in_name IN VARCHAR2, c_num out INT, c_name out VARCHAR2, c_address out VARCHAR2);
     PROCEDURE printProduct(name IN VARCHAR2);
     PROCEDURE addLineitem(name IN VARCHAR2, quantity in INT);
     PROCEDURE addOrderLineitems;
@@ -71,20 +71,15 @@ BEGIN
         USING maxid, name, price;
 END addProduct;
 
-PROCEDURE printCustomer(name IN VARCHAR2) AS
-        c_num INT;
-        c_name VARCHAR2(10);
-        c_address VARCHAR2(30);
+PROCEDURE printCustomer(in_name IN VARCHAR2, c_num out INT, c_name out VARCHAR2, c_address out VARCHAR2) AS
     BEGIN
         -- Retrieve customer information based on the provided name
-        SELECT "C#", Name, Address INTO c_num, c_name, c_address
+        SELECT * INTO c_num, c_name, c_address
         FROM Customer
-        WHERE Name = name;
+        WHERE Name = in_name;
 
         -- Print customer information
-        DBMS_OUTPUT.PUT_LINE('Customer ID: ' || c_num);
-        DBMS_OUTPUT.PUT_LINE('Name: ' || c_name);
-        DBMS_OUTPUT.PUT_LINE('Address: ' || c_address);
+        
      COMMIT;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
