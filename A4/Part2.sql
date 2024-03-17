@@ -1,15 +1,3 @@
--- create type test_t as object (name varchar2(10));
--- /
-
--- create type item as varray(10) of ref test_t;
--- /
-
--- create table test of test_t;
--- alter table test add spouse item;
--- insert into test values ('Anna', null);
--- insert into test select 'Cook', ref(t) from test t where name = 'Anna';
--- update test set spouse = (select ref(t) from test t where t.name = 'Cook') where name = 'Anna';
-
 create type item_t as object(i_id int, o_id int, p_id int, qty int);
 /
 
@@ -99,14 +87,27 @@ select * from Orders;
 select * from LineItems;
 select * from Product;
 
--- SELECT ROWID, o.*
--- FROM Orders o
--- WHERE odate = 'Feb 1, 2024';
+SELECT c.rowid AS "C#", c.name AS "Name", c.address AS "Address" FROM Customer c;
+SELECT p.rowid AS "P#", p.name AS "Name", p.price AS "Price" FROM Product p;
+SELECT DISTINCT c.name FROM Customer c JOIN Orders o ON c.c_id = o.c_id JOIN LineItems li ON o.o_id = li.o_id JOIN Product p ON li.p_id = p.p_id WHERE p.name = 'banana';
+SELECT c.c_id, c.name AS customer_name, c.address AS customer_address,
+       CAST(MULTISET(
+           SELECT o.o_id, o.odate, o.price,
+                  CAST(MULTISET(
+                      SELECT li.i_id, li.o_id, li.p_id, li.qty
+                      FROM LineItems li
+                      WHERE li.o_id = o.o_id
+                      ORDER BY li.i_id
+                  ) AS item_v) AS items
+           FROM Orders o
+           WHERE o.c_id = c.c_id
+           ORDER BY o.o_id
+       ) AS order_v) AS orders
+FROM Customer c
+WHERE c.name = 'MacDiarmid';
 
--- -- Get the ID of the inserted customer in the Customer table
--- SELECT ROWID, c.*
--- FROM Customer c
--- WHERE name = 'Smith';
+
+SELECT c.name FROM Customer c WHERE NOT EXISTS (SELECT DISTINCT p.p_id FROM Product p WHERE NOT EXISTS (SELECT 1 FROM Orders o JOIN LineItems li ON o.o_id = li.o_id WHERE o.c_id = c.c_id AND p.p_id = li.p_id));
 
 drop table Customer;
 drop table Orders;
@@ -119,32 +120,3 @@ drop type order_v;
 drop type order_t;
 drop type item_v;
 drop type item_t;
-
--- create type item as object (qty varchar2(5)) not final;
--- /
--- create type ord as object (odate varchar2(20), price varchar2(10) items ref item) not final;
--- /
--- create type cus as object (name varchar2(15), address varchar2(20), orders ref ord) not final;
--- /
--- create type prod as object (name varchar2(10), price varchar2(10), items item) not final;
--- /
-
--- create type LineItems as table of item;
--- create type Orders as table of ord;
--- create type Customer as table of cus;
--- create type Product as table of prod;
-
--- select * from Customer;
--- select * from Product;
--- select * from Orders;
--- select * from LineItems;
-
--- drop type Customer;
--- drop type Product;
--- drop type Orders;
--- drop type LineItems;
-
--- drop type cus;
--- drop type prod;
--- drop type ord;
--- drop type item;
