@@ -1,3 +1,5 @@
+-- Part 2.1 --
+
 create type item_t as object(i_id int, o_id int, p_id int, qty int);
 /
 
@@ -25,6 +27,8 @@ desc Customer;
 desc Orders;
 desc LineItems;
 desc Product;
+
+-- Part 2.2 --
 
 insert into LineItems values (1, 1, 1, 1);
 insert into LineItems values (2, 2, 1, 1);
@@ -70,11 +74,11 @@ insert into Orders values (3, 3, 'Jan 3, 2024', '3.79', item_v((select ref(i) fr
 insert into Orders values (4, 4, 'Jan 4, 2024', '7.04', item_v((select ref(i) from LineItems i where i_id = 7), (select ref(i) from LineItems i where i_id = 8), (select ref(i) from LineItems i where i_id = 9), (select ref(i) from LineItems i where i_id = 10)));
 insert into Orders values (5, 5, 'Jan 5, 2024', '12.03', item_v((select ref(i) from LineItems i where i_id = 11), (select ref(i) from LineItems i where i_id = 12), (select ref(i) from LineItems i where i_id = 13), (select ref(i) from LineItems i where i_id = 14), (select ref(i) from LineItems i where i_id = 15)));
 
-insert into Orders values (6, 5, 'Feb 1, 2024', '12.03', item_v((select ref(i) from LineItems i where i_id = 16)));
-insert into Orders values (7, 4, 'Feb 2, 2024', '10.78', item_v((select ref(i) from LineItems i where i_id = 17), (select ref(i) from LineItems i where i_id = 18)));
+insert into Orders values (6, 5, 'Feb 1, 2024', '4.99', item_v((select ref(i) from LineItems i where i_id = 16)));
+insert into Orders values (7, 4, 'Feb 2, 2024', '8.24', item_v((select ref(i) from LineItems i where i_id = 17), (select ref(i) from LineItems i where i_id = 18)));
 insert into Orders values (8, 3, 'Feb 3, 2024', '9.99', item_v((select ref(i) from LineItems i where i_id = 19), (select ref(i) from LineItems i where i_id = 20), (select ref(i) from LineItems i where i_id = 21)));
-insert into Orders values (9, 2, 'Feb 4, 2024', '8.24', item_v((select ref(i) from LineItems i where i_id = 22), (select ref(i) from LineItems i where i_id = 23), (select ref(i) from LineItems i where i_id = 24), (select ref(i) from LineItems i where i_id = 25)));
-insert into Orders values (10, 1, 'Feb 5, 2024', '4.99', item_v((select ref(i) from LineItems i where i_id = 26), (select ref(i) from LineItems i where i_id = 27), (select ref(i) from LineItems i where i_id = 28), (select ref(i) from LineItems i where i_id = 29), (select ref(i) from LineItems i where i_id = 30)));
+insert into Orders values (9, 2, 'Feb 4, 2024', '10.78', item_v((select ref(i) from LineItems i where i_id = 22), (select ref(i) from LineItems i where i_id = 23), (select ref(i) from LineItems i where i_id = 24), (select ref(i) from LineItems i where i_id = 25)));
+insert into Orders values (10, 1, 'Feb 5, 2024', '12.03', item_v((select ref(i) from LineItems i where i_id = 26), (select ref(i) from LineItems i where i_id = 27), (select ref(i) from LineItems i where i_id = 28), (select ref(i) from LineItems i where i_id = 29), (select ref(i) from LineItems i where i_id = 30)));
 
 insert into Customer values (1, 'Smith', '1125 Colonel By Dr', order_v((select ref(o) from Orders o where o_id = 1), (select ref(o) from Orders o where o_id = 10)));
 insert into Customer values (2, 'Jones', '1125 Colonel By Dr', order_v((select ref(o) from Orders o where o_id = 2), (select ref(o) from Orders o where o_id = 9)));
@@ -82,32 +86,25 @@ insert into Customer values (3, 'Blake', '1125 Colonel By Dr', order_v((select r
 insert into Customer values (4, 'Clark', '1125 Colonel By Dr', order_v((select ref(o) from Orders o where o_id = 4), (select ref(o) from Orders o where o_id = 7)));
 insert into Customer values (5, 'MacDiarmid', '1125 Colonel By Dr', order_v((select ref(o) from Orders o where o_id = 5), (select ref(o) from Orders o where o_id = 6)));
 
-select * from Customer;
-select * from Orders;
-select * from LineItems;
-select * from Product;
+-- Part 2.3.1 --
 
-SELECT c.rowid AS "C#", c.name AS "Name", c.address AS "Address" FROM Customer c;
-SELECT p.rowid AS "P#", p.name AS "Name", p.price AS "Price" FROM Product p;
-SELECT DISTINCT c.name FROM Customer c JOIN Orders o ON c.c_id = o.c_id JOIN LineItems li ON o.o_id = li.o_id JOIN Product p ON li.p_id = p.p_id WHERE p.name = 'banana';
-SELECT c.c_id, c.name AS customer_name, c.address AS customer_address,
-       CAST(MULTISET(
-           SELECT o.o_id, o.odate, o.price,
-                  CAST(MULTISET(
-                      SELECT li.i_id, li.o_id, li.p_id, li.qty
-                      FROM LineItems li
-                      WHERE li.o_id = o.o_id
-                      ORDER BY li.i_id
-                  ) AS item_v) AS items
-           FROM Orders o
-           WHERE o.c_id = c.c_id
-           ORDER BY o.o_id
-       ) AS order_v) AS orders
-FROM Customer c
-WHERE c.name = 'MacDiarmid';
+select c.rowid as "C#", c.name as "Name", c.address as "Address" from Customer c;
 
+-- Part 2.3.2 --
 
-SELECT c.name FROM Customer c WHERE NOT EXISTS (SELECT DISTINCT p.p_id FROM Product p WHERE NOT EXISTS (SELECT 1 FROM Orders o JOIN LineItems li ON o.o_id = li.o_id WHERE o.c_id = c.c_id AND p.p_id = li.p_id));
+select p.rowid as "P#", p.name as "Name", p.price as "Price" from Product p;
+
+-- Part 2.3.3 --
+
+select distinct c.name from Customer c join Orders o on c.c_id = o.c_id join LineItems li on o.o_id = li.o_id join Product p on li.p_id = p.p_id where p.name = 'banana';
+
+-- Part 2.3.4 --
+
+select c.name, deref(value(o)).o_id as O#, deref(value(o)).odate as odate, deref(value(o)).price as TOTAL, deref(value(i)).i_id as I#, deref(value(i)).qty as QTY from Customer c, table(c.orders) o, table(deref(value(o)).items) i where c.name = 'MacDiarmid';
+
+-- Part 2.3.5 --
+
+select c.name from Customer c where not exists (select distinct p.p_id from Product p where not exists (select 1 from Orders o join LineItems li on o.o_id = li.o_id where o.c_id = c.c_id and p.p_id = li.p_id));
 
 drop table Customer;
 drop table Orders;
